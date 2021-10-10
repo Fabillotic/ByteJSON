@@ -143,7 +143,7 @@ class ConstPool:
             elif t ==  6: #Double
                 n = d[:8]
                 d = d[8:]
-                r.append({"index": i, "type": "double", "data": d.hex()})
+                r.append({"index": i, "type": "double", "data": n.hex()})
                 i += 1
             elif t ==  7: #Class
                 n = int.from_bytes(d[:2], "big")
