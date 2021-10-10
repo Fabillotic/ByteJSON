@@ -19,8 +19,6 @@ class ClassFile:
         r["version"] = {"major": major, "minor": minor}
         r["pool"], d = ConstPool.serialize(d)
         
-#        print(d.hex())
-        
         r["access_flags"] = int.from_bytes(d[:2], "big")
         d = d[2:]
         
@@ -100,8 +98,6 @@ class ClassFile:
         r += len(d["attributes"]).to_bytes(2, "big")
         for a in d["attributes"]:
             r += Attribute.deserialize(a)
-
-#        print(r[DEBUG_l:].hex())
         
         return r
 
@@ -202,7 +198,7 @@ class ConstPool:
     def deserialize(d):
         r = b""
         
-        r += (len(d) + 1).to_bytes(2, "big")
+        r += (d[-1]["index"] + 1).to_bytes(2, "big")
         m = 0
         
         for e in d:
@@ -366,12 +362,16 @@ class Attribute:
 if __name__ == "__main__":
     f = open("Main.class", "rb")
     d = f.read()
-    print(d.hex())
     f.close()
+    
     j = ClassFile.serialize(d)
     print(json.dumps(j, indent=4))
+    
     dn = ClassFile.deserialize(j)
-    print(dn.hex())
+
+    f = open("Main_.class", "wb")
+    f.write(dn)
+    f.close()
     
     print(len(d), len(dn))
     print(d == dn)
