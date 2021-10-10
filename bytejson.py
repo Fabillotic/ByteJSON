@@ -1,4 +1,5 @@
 import json
+import struct
 
 class ClassFile:
     def __init__(self):
@@ -122,22 +123,22 @@ class ConstPool:
                 d = d[sl:]
                 r.append({"index": i, "type": "utf8", "data": s})
             elif t ==  3: #Integer
-                n = int.from_bytes(d[:4], "big")
+                n = struct.unpack(">i", d[:4])[0]
                 d = d[4:]
                 r.append({"index": i, "type": "int", "data": n})
             elif t ==  4: #Float
-                f = d[:4]
+                f = struct.unpack(">f", d[:4])[0]
                 d = d[4:]
-                r.append({"index": i, "type": "float", "data": f.hex()})
+                r.append({"index": i, "type": "float", "data": f})
             elif t ==  5: #Long
-                n = int.from_bytes(d[:8], "big")
+                n = struct.unpack(">q", d[:8])[0]
                 d = d[8:]
                 r.append({"index": i, "type": "long", "data": n})
                 i += 1
             elif t ==  6: #Double
-                n = d[:8]
+                n = struct.unpack(">d", d[:8])[0]
                 d = d[8:]
-                r.append({"index": i, "type": "double", "data": n.hex()})
+                r.append({"index": i, "type": "double", "data": n})
                 i += 1
             elif t ==  7: #Class
                 n = int.from_bytes(d[:2], "big")
@@ -211,13 +212,13 @@ class ConstPool:
                         s = e["data"].encode("utf8")
                         r += b"\x01" + len(s).to_bytes(2, "big") + s
                     elif t == "int":
-                        r += b"\x03" + e["data"].to_bytes(4, "big")
+                        r += b"\x03" + struct.pack(">i", e["data"])
                     elif t == "float":
-                        r += b"\x04" + bytes.fromhex(e["data"])
+                        r += b"\x04" + struct.pack(">f", e["data"])
                     elif t == "long":
-                        r += b"\x05" + e["data"].to_bytes(8, "big")
+                        r += b"\x05" + struct.pack(">q", e["data"])
                     elif t == "double":
-                        r += b"\x06" + bytes.fromhex(e["data"])
+                        r += b"\x06" + struct.pack(">d", e["data"])
                     elif t == "class":
                         r += b"\x07" + e["data"].to_bytes(2, "big")
                     elif t == "string":
