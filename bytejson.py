@@ -77,8 +77,6 @@ class ClassFile:
         
         r += ConstPool.deserialize(d["pool"])
 
-        DEBUG_l = len(r)
-
         r += d["access_flags"].to_bytes(2, "big")
         r += d["this_class"].to_bytes(2, "big")
         r += d["super_class"].to_bytes(2, "big")
