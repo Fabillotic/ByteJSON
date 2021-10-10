@@ -1,3 +1,5 @@
+.*
+!.gitignore
 *.swp
 *.class
 *.json
