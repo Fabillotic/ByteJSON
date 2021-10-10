@@ -18,15 +18,55 @@ class ClassFile:
         
         r["version"] = {"major": major, "minor": minor}
         r["pool"], d = ConstPool.serialize(d)
-
+        
+#        print(d.hex())
+        
         r["access_flags"] = int.from_bytes(d[:2], "big")
         d = d[2:]
-
+        
         r["this_class"] = int.from_bytes(d[:2], "big")
         d = d[2:]
-
+        
         r["super_class"] = int.from_bytes(d[:2], "big")
         d = d[2:]
+        
+        r["interfaces"] = []
+        
+        ic = int.from_bytes(d[:2], "big")
+        d = d[2:]
+        
+        for i in range(ic):
+            r["interfaces"].append(int.from_bytes(d[:2], "big"))
+            d = d[2:]
+        
+        r["fields"] = []
+        
+        fc = int.from_bytes(d[:2], "big")
+        d = d[2:]
+        
+        for i in range(fc):
+            f, d = Field.serialize(d)
+            r["fields"].append(f)
+        
+        r["methods"] = []
+        
+        mc = int.from_bytes(d[:2], "big")
+        d = d[2:]
+        
+        for i in range(mc):
+            m, d = Method.serialize(d)
+            r["methods"].append(m)
+        
+        r["attributes"] = []
+        
+        ac = int.from_bytes(d[:2], "big")
+        d = d[2:]
+        
+        for i in range(ac):
+            a, d = Attribute.serialize(d)
+            r["attributes"].append(a)
+
+        
         return r
 
     @staticmethod
@@ -39,9 +79,30 @@ class ClassFile:
         
         r += ConstPool.deserialize(d["pool"])
 
+        DEBUG_l = len(r)
+
         r += d["access_flags"].to_bytes(2, "big")
         r += d["this_class"].to_bytes(2, "big")
         r += d["super_class"].to_bytes(2, "big")
+        
+        r += len(d["interfaces"]).to_bytes(2, "big")
+        for i in d["interfaces"]:
+            r += i.to_bytes(2, "big")
+
+        r += len(d["fields"]).to_bytes(2, "big")
+        for f in d["fields"]:
+            r += Field.deserialize(f)
+        
+        r += len(d["methods"]).to_bytes(2, "big")
+        for m in d["methods"]:
+            r += Method.deserialize(m)
+        
+        r += len(d["attributes"]).to_bytes(2, "big")
+        for a in d["attributes"]:
+            r += Attribute.deserialize(a)
+
+#        print(r[DEBUG_l:].hex())
+        
         return r
 
 class ConstPool:
@@ -191,11 +252,41 @@ class Field:
     
     @staticmethod
     def serialize(d):
-        pass
+        r = {}
+        
+        r["access_flags"] = int.from_bytes(d[:2], "big")
+        d = d[2:]
+        
+        r["name"] = int.from_bytes(d[:2], "big")
+        d = d[2:]
+        
+        r["type"] = int.from_bytes(d[:2], "big")
+        d = d[2:]
+        
+        ac = int.from_bytes(d[:2], "big")
+        d = d[2:]
+        
+        r["attributes"] = []
+        
+        for i in range(ac):
+            a, d = Attribute.serialize(d)
+            r["attributes"].append(a)
+        
+        return r, d
     
     @staticmethod
     def deserialize(d):
-        pass
+        r = b""
+        
+        r += d["access_flags"].to_bytes(2, "big")
+        r += d["name"].to_bytes(2, "big")
+        r += d["type"].to_bytes(2, "big")
+        
+        r += len(d["attributes"]).to_bytes(2, "big")
+        for a in d["attributes"]:
+            r += Attribute.deserialize(a)
+        
+        return r
 
 class Method:
     def __init__(self):
@@ -203,11 +294,41 @@ class Method:
     
     @staticmethod
     def serialize(d):
-        pass
+        r = {}
+        
+        r["access_flags"] = int.from_bytes(d[:2], "big")
+        d = d[2:]
+        
+        r["name"] = int.from_bytes(d[:2], "big")
+        d = d[2:]
+        
+        r["type"] = int.from_bytes(d[:2], "big")
+        d = d[2:]
+        
+        ac = int.from_bytes(d[:2], "big")
+        d = d[2:]
+        
+        r["attributes"] = []
+        
+        for i in range(ac):
+            a, d = Attribute.serialize(d)
+            r["attributes"].append(a)
+        
+        return r, d
     
     @staticmethod
     def deserialize(d):
-        pass
+        r = b""
+        
+        r += d["access_flags"].to_bytes(2, "big")
+        r += d["name"].to_bytes(2, "big")
+        r += d["type"].to_bytes(2, "big")
+        
+        r += len(d["attributes"]).to_bytes(2, "big")
+        for a in d["attributes"]:
+            r += Attribute.deserialize(a)
+        
+        return r
 
 class Attribute:
     def __init__(self):
@@ -215,11 +336,32 @@ class Attribute:
     
     @staticmethod
     def serialize(d):
-        pass
+        r = {"type": None}
+        
+        r["name"] = int.from_bytes(d[:2], "big")
+        d = d[2:]
+
+        l = int.from_bytes(d[:4], "big")
+        d = d[4:]
+
+        r["data"] = d[:l].hex()
+        d = d[l:]
+        
+        return r, d
     
     @staticmethod
     def deserialize(d):
-        pass
+        r = b""
+        
+        r += d["name"].to_bytes(2, "big")
+        
+        ad = bytes.fromhex(d["data"])
+
+        r += len(ad).to_bytes(4, "big")
+        if d["type"] == None:
+            r += ad
+        
+        return r
 
 if __name__ == "__main__":
     f = open("Main.class", "rb")
@@ -227,6 +369,13 @@ if __name__ == "__main__":
     print(d.hex())
     f.close()
     j = ClassFile.serialize(d)
-    print(json.dumps(j))
+    print(json.dumps(j, indent=4))
     dn = ClassFile.deserialize(j)
     print(dn.hex())
+    
+    print(len(d), len(dn))
+    print(d == dn)
+
+    f = open("Main.json", "w")
+    f.write(json.dumps(j, indent=4))
+    f.close()
