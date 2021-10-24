@@ -44,7 +44,7 @@ class ClassFile:
         d = d[2:]
         
         for i in range(fc):
-            f, d = Field.serialize(d)
+            f, d = Field.serialize(d, r["pool"])
             r["fields"].append(f)
         
         r["methods"] = []
@@ -53,7 +53,7 @@ class ClassFile:
         d = d[2:]
         
         for i in range(mc):
-            m, d = Method.serialize(d)
+            m, d = Method.serialize(d, r["pool"])
             r["methods"].append(m)
         
         r["attributes"] = []
@@ -62,7 +62,7 @@ class ClassFile:
         d = d[2:]
         
         for i in range(ac):
-            a, d = Attribute.serialize(d)
+            a, d = Attribute.serialize(d, r["pool"])
             r["attributes"].append(a)
 
         
@@ -246,7 +246,7 @@ class Field:
         pass
     
     @staticmethod
-    def serialize(d):
+    def serialize(d, cpool):
         r = {}
         
         r["access_flags"] = int.from_bytes(d[:2], "big")
@@ -264,7 +264,7 @@ class Field:
         r["attributes"] = []
         
         for i in range(ac):
-            a, d = Attribute.serialize(d)
+            a, d = Attribute.serialize(d, cpool)
             r["attributes"].append(a)
         
         return r, d
@@ -288,7 +288,7 @@ class Method:
         pass
     
     @staticmethod
-    def serialize(d):
+    def serialize(d, cpool):
         r = {}
         
         r["access_flags"] = int.from_bytes(d[:2], "big")
@@ -306,7 +306,7 @@ class Method:
         r["attributes"] = []
         
         for i in range(ac):
-            a, d = Attribute.serialize(d)
+            a, d = Attribute.serialize(d, cpool)
             r["attributes"].append(a)
         
         return r, d
@@ -330,15 +330,17 @@ class Attribute:
         pass
     
     @staticmethod
-    def serialize(d):
+    def serialize(d, cpool):
         r = {"type": None}
         
-        r["name"] = int.from_bytes(d[:2], "big")
+        r["name_index"] = int.from_bytes(d[:2], "big")
         d = d[2:]
-
+        
+        t = cpool[r["name_index"]]
+        
         l = int.from_bytes(d[:4], "big")
         d = d[4:]
-
+        
         r["data"] = d[:l].hex()
         d = d[l:]
         
@@ -348,12 +350,12 @@ class Attribute:
     def deserialize(d):
         r = b""
         
-        r += d["name"].to_bytes(2, "big")
+        r += d["name_index"].to_bytes(2, "big")
         
-        ad = bytes.fromhex(d["data"])
-
-        r += len(ad).to_bytes(4, "big")
         if d["type"] == None:
+            ad = bytes.fromhex(d["data"])
+            
+            r += len(ad).to_bytes(4, "big")
             r += ad
         
         return r
