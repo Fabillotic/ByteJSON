@@ -336,7 +336,12 @@ class Attribute:
         r["name_index"] = int.from_bytes(d[:2], "big")
         d = d[2:]
         
-        t = cpool[r["name_index"]]
+        t = None
+        for x in cpool:
+            if x["index"] == r ["name_index"]:
+                t = x["data"]
+
+        print("Index: " + str(t))
         
         l = int.from_bytes(d[:4], "big")
         d = d[4:]
