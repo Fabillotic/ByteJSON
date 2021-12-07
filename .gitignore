@@ -3,4 +3,5 @@
 *.swp
 *.class
 *.json
+*.bak
 __pycache__
