@@ -338,14 +338,92 @@ class Attribute:
         
         t = None
         for x in cpool:
-            if x["index"] == r ["name_index"]:
+            if x["index"] == r["name_index"]:
                 t = x["data"]
         
         l = int.from_bytes(d[:4], "big")
         d = d[4:]
         
-        r["data"] = d[:l].hex()
-        d = d[l:]
+        c = False
+        if t:
+            c = True
+            if t.lower() == "constantvalue":
+                r["data"] = int.from_bytes(d[:2], "big")
+                d = d[2:]
+            elif t.lower() == "code":
+                r["data"] = {}
+                r["data"]["max_stack"] = int.from_bytes(d[:2], "big")
+                d = d[2:]
+                r["data"]["max_locals"] = int.from_bytes(d[:2], "big")
+                d = d[2:]
+                
+                codelen = int.from_bytes(d[:4], "big")
+                d = d[4:]
+                
+                code = d[:codelen]
+                d = d[codelen:]
+                
+                r["data"]["code"] = code.hex()
+                
+                elen = int.from_bytes(d[:2], "big")
+                d = d[2:]
+                
+                r["data"]["exceptions"] = []
+                
+                for i in range(elen):
+                    e = {}
+                    e["start_pc"] = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    e["end_pc"] = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    e["handler_pc"] = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    e["catch_type"] = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    r["data"]["exceptions"].append(e)
+
+                ac = int.from_bytes(d[:2], "big")
+                d = d[2:]
+                
+                r["data"]["attributes"] = []
+                
+                for i in range(ac):
+                    a, d = Attribute.serialize(d, cpool)
+                    r["data"]["attributes"].append(a)
+            elif t.lower() == "exceptions":
+                r["data"] = []
+
+                elen = int.from_bytes(d[:2], "big")
+                d = d[2:]
+                
+                for i in range(elen):
+                    r["data"].append(int.from_bytes(d[:2], "big"))
+                    d = d[2:]
+            elif t.lower() == "innerclasses":
+                r["data"] = []
+                
+                ilen = int.from_bytes(d[:2], "big")
+                d = d[2:]
+                
+                for i in range(ilen):
+                    cl = {}
+                    cl["inner_class_info_index"] = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    cl["outer_class_info_index"] = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    cl["inner_name_index"] = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    cl["inner_class_access_flags"] = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    r["data"].append(cl)
+            else:
+                c = False
+        
+        if c:
+            r["type"] = t
+        else:
+            r["data"] = d[:l].hex()
+            d = d[l:]
         
         return r, d
     
@@ -360,6 +438,57 @@ class Attribute:
             
             r += len(ad).to_bytes(4, "big")
             r += ad
+        elif d["type"].lower() == "constantvalue":
+            tmp = b""
+
+            tmp += d["data"].to_bytes(2, "big")
+
+            r += len(tmp).to_bytes(4, "big")
+            r += tmp
+        elif d["type"].lower() == "code":
+            tmp = b""
+            
+            tmp += d["data"]["max_stack"].to_bytes(2, "big")
+            tmp += d["data"]["max_locals"].to_bytes(2, "big")
+            
+            code = bytes.fromhex(d["data"]["code"])
+            tmp += len(code).to_bytes(4, "big")
+            tmp += code
+            
+            tmp += len(d["data"]["exceptions"]).to_bytes(2, "big")
+            for e in d["data"]["exceptions"]:
+                tmp += e["start_pc"].to_bytes(2, "big")
+                tmp += e["end_pc"].to_bytes(2, "big")
+                tmp += e["handler_pc"].to_bytes(2, "big")
+                tmp += e["catch_type"].to_bytes(2, "big")
+
+            tmp += len(d["data"]["attributes"]).to_bytes(2, "big")
+            for a in d["data"]["attributes"]:
+                tmp += Attribute.deserialize(a)
+            
+            r += len(tmp).to_bytes(4, "big")
+            r += tmp
+        elif d["type"].lower() == "exceptions":
+            tmp = b""
+
+            tmp += len(d["data"]).to_bytes(2, "big")
+            for e in d["data"]:
+                tmp += e.to_bytes(2, "big")
+            
+            r += len(tmp).to_bytes(4, "big")
+            r += tmp
+        elif d["type"].lower() == "innerclasses":
+            tmp = b""
+            
+            tmp += len(d["data"]).to_bytes(2, "big")
+            for i in d["data"]:
+                tmp += i["inner_class_info_index"].to_bytes(2, "big")
+                tmp += i["outer_class_info_index"].to_bytes(2, "big")
+                tmp += i["inner_name_index"].to_bytes(2, "big")
+                tmp += i["inner_class_access_flags"].to_bytes(2, "big")
+            
+            r += len(tmp).to_bytes(4, "big")
+            r += tmp
         
         return r
 
