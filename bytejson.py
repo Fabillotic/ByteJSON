@@ -423,6 +423,12 @@ class Attribute:
                 r["data"] = None
             elif t.lower() == "deprecated":
                 r["data"] = None
+            elif t.lower() == "enclosingmethod":
+                r["data"] = {}
+                r["data"]["class_index"] = int.from_bytes(d[:2], "big")
+                d = d[2:]
+                r["data"]["method_index"] = int.from_bytes(d[:2], "big")
+                d = d[2:]
             else:
                 c = False
         
@@ -503,6 +509,13 @@ class Attribute:
             r += b"\x00\x00\x00\x00"
         elif d["type"].lower() == "deprecated":
             r += b"\x00\x00\x00\x00"
+        elif d["type"].lower() == "enclosingmethod":
+            tmp = b""
+            tmp += d["data"]["class_index"].to_bytes(2, "big")
+            tmp += d["data"]["method_index"].to_bytes(2, "big")
+
+            r += len(tmp).to_bytes(4, "big")
+            r += tmp
         
         return r
 
