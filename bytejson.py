@@ -429,6 +429,10 @@ class Attribute:
                 d = d[2:]
                 r["data"]["method_index"] = int.from_bytes(d[:2], "big")
                 d = d[2:]
+            elif t.lower() == "stackmaptable":
+                print("StackMapTable:", d[:l].hex())
+                r["data"] = d[:l].hex()
+                d = d[l:]
             else:
                 c = False
         
