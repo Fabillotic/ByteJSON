@@ -419,6 +419,10 @@ class Attribute:
             elif t.lower() == "sourcefile":
                 r["data"] = int.from_bytes(d[:2], "big")
                 d = d[2:]
+            elif t.lower() == "synthetic":
+                r["data"] = None
+            elif t.lower() == "deprecated":
+                r["data"] = None
             else:
                 c = False
         
@@ -495,6 +499,10 @@ class Attribute:
         elif d["type"].lower() == "sourcefile":
             r += b"\x00\x00\x00\x02"
             r += d["data"].to_bytes(2, "big")
+        elif d["type"].lower() == "synthetic":
+            r += b"\x00\x00\x00\x00"
+        elif d["type"].lower() == "deprecated":
+            r += b"\x00\x00\x00\x00"
         
         return r
 
