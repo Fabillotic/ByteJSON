@@ -416,6 +416,9 @@ class Attribute:
                     cl["inner_class_access_flags"] = int.from_bytes(d[:2], "big")
                     d = d[2:]
                     r["data"].append(cl)
+            elif t.lower() == "sourcefile":
+                r["data"] = int.from_bytes(d[:2], "big")
+                d = d[2:]
             else:
                 c = False
         
@@ -489,6 +492,9 @@ class Attribute:
             
             r += len(tmp).to_bytes(4, "big")
             r += tmp
+        elif d["type"].lower() == "sourcefile":
+            r += b"\x00\x00\x00\x02"
+            r += d["data"].to_bytes(2, "big")
         
         return r
 
