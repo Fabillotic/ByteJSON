@@ -430,9 +430,7 @@ class Attribute:
                 r["data"]["method_index"] = int.from_bytes(d[:2], "big")
                 d = d[2:]
             elif t.lower() == "stackmaptable":
-                #sd = d[:l]
                 smt = d[:l]
-                #print("StackMapTable:", sd.hex())
                 
                 es = int.from_bytes(smt[:2], "big")
                 smt = smt[2:]
@@ -473,30 +471,30 @@ class Attribute:
                     
                     frame = None
                     if tag >= 0 and tag <= 63: #same_frame
-                        frame = {"tag": tag, "frame": "same_frame", "offset_delta": tag}
+                        frame = {"type": "same_frame", "offset_delta": tag}
                     elif tag >= 64 and tag <= 127: #same_locals_1_stack_item_frame
                         smt, vti = verification_type_info(smt, 1)
-                        frame = {"tag": tag, "frame": "same_locals_1_stack_item_frame", "offset_delta": tag - 64, "stack": vti}
+                        frame = {"type": "same_locals_1_stack_item_frame", "offset_delta": tag - 64, "stack": vti}
                     elif tag == 247: #same_locals_1_stack_item_frame_extended
                         offset_delta = int.from_bytes(smt[:2], "big")
                         smt = smt[2:]
                         smt, vti = verification_type_info(smt, 1)
-                        frame = {"tag": tag, "frame": "same_locals_1_stack_item_frame_extended", "offset_delta": offset_delta, "stack": vti}
+                        frame = {"type": "same_locals_1_stack_item_frame_extended", "offset_delta": offset_delta, "stack": vti}
                     elif tag >= 248 and tag <= 250: #chop_frame
                         offset_delta = int.from_bytes(smt[:2], "big")
                         smt = smt[2:]
-                        frame = {"tag": tag, "frame": "chop_frame", "offset_delta": offset_delta, "locals_absent": 251 - tag}
+                        frame = {"type": "chop_frame", "offset_delta": offset_delta, "locals_absent": 251 - tag}
                     elif tag == 251: #same_frame_extended
                         offset_delta = int.from_bytes(smt[:2], "big")
                         smt = smt[2:]
-                        frame = {"tag": tag, "frame": "same_frame_extended", "offset_delta": offset_delta}
+                        frame = {"type": "same_frame_extended", "offset_delta": offset_delta}
                     elif tag >= 252 and tag <= 254: #append_frame
                         offset_delta = int.from_bytes(smt[:2], "big")
                         smt = smt[2:]
                         locals_plus = tag - 251
                         smt, vti = verification_type_info(smt, locals_plus)
-                        frame = {"tag": tag, "frame": "append_frame", "offset_delta": offset_delta, "locals": vti}
-                    elif tag == 255:
+                        frame = {"type": "append_frame", "offset_delta": offset_delta, "locals": vti}
+                    elif tag == 255: #full_frame
                         offset_delta = int.from_bytes(smt[:2], "big")
                         smt = smt[2:]
                         number_of_locals = int.from_bytes(smt[:2], "big")
@@ -505,11 +503,9 @@ class Attribute:
                         number_of_stack_items = int.from_bytes(smt[:2], "big")
                         smt = smt[2:]
                         smt, stack = verification_type_info(smt, number_of_stack_items)
-                        frame = {"tag": tag, "frame": "full_frame", "offset_delta": offset_delta, "locals": all_locals, "stack": stack}
+                        frame = {"type": "full_frame", "offset_delta": offset_delta, "locals": all_locals, "stack": stack}
 
                     r["data"].append(frame)
-                
-                #r["data"] = sd.hex()
                 d = d[l:]
             elif t.lower() == "signature":
                 r["data"] = int.from_bytes(d[:2], "big")
@@ -659,34 +655,32 @@ class Attribute:
             tmp += len(d["data"]).to_bytes(2, "big")
             
             for frame in d["data"]:
-                tmp += frame["tag"].to_bytes(1, "big")
-
-                if frame["frame"] == "same_frame": #same_frame, add no more information
-                    pass
-                elif frame["frame"] == "same_locals_1_stack_item_frame":
+                if frame["type"] == "same_frame":
+                    tmp += frame["offset_delta"].to_bytes(1, "big") #TAG
+                elif frame["type"] == "same_locals_1_stack_item_frame":
+                    tmp += (frame["offset_delta"] + 64).to_bytes(1, "big") #TAG
                     tmp += verification_type_info(frame["stack"])
-                elif frame["frame"] == "same_locals_1_stack_item_frame_extended":
+                elif frame["type"] == "same_locals_1_stack_item_frame_extended":
+                    tmp += b"\xf7" #TAG
                     tmp += frame["offset_delta"].to_bytes(2, "big")
                     tmp += verification_type_info(frame["stack"])
-                elif frame["frame"] == "chop_frame":
+                elif frame["type"] == "chop_frame":
+                    tmp += (251 - frame["locals_absent"]).to_bytes(1, "big")  #TAG
                     tmp += frame["offset_delta"].to_bytes(2, "big")
-                elif frame["frame"] == "same_frame_extended":
+                elif frame["type"] == "same_frame_extended":
+                    tmp += b"\xfb" #TAG
                     tmp += frame["offset_delta"].to_bytes(2, "big")
-                elif frame["frame"] == "append_frame":
+                elif frame["type"] == "append_frame":
+                    tmp += (len(frame["locals"]) + 251).to_bytes(1, "big") #TAG
                     tmp += frame["offset_delta"].to_bytes(2, "big")
                     tmp += verification_type_info(frame["locals"])
-                elif frame["frame"] == "full_frame":
+                elif frame["type"] == "full_frame":
+                    tmp += b"\xff"
                     tmp += frame["offset_delta"].to_bytes(2, "big")
                     tmp += len(frame["locals"]).to_bytes(2, "big")
                     tmp += verification_type_info(frame["locals"])
                     tmp += len(frame["stack"]).to_bytes(2, "big")
                     tmp += verification_type_info(frame["stack"])
-
-            #print("StackMapTable:", tmp.hex())
-            #ad = bytes.fromhex(d["data"])
-            
-            #r += len(ad).to_bytes(4, "big")
-            #r += ad
 
             r += len(tmp).to_bytes(4, "big")
             r += tmp
