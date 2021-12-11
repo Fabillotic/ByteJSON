@@ -430,8 +430,86 @@ class Attribute:
                 r["data"]["method_index"] = int.from_bytes(d[:2], "big")
                 d = d[2:]
             elif t.lower() == "stackmaptable":
-                print("StackMapTable:", d[:l].hex())
-                r["data"] = d[:l].hex()
+                #sd = d[:l]
+                smt = d[:l]
+                #print("StackMapTable:", sd.hex())
+                
+                es = int.from_bytes(smt[:2], "big")
+                smt = smt[2:]
+
+                def verification_type_info(smt, n): #Read n verification_type_info structures
+                    vtypes = []
+                    for i in range(n):
+                        vtag = int.from_bytes(smt[:1], "big")
+                        smt = smt[1:]
+
+                        if vtag == 0: #top
+                            vtypes.append({"type": "top"})
+                        elif vtag == 1: #int
+                            vtypes.append({"type": "int"})
+                        elif vtag == 2: #float
+                            vtypes.append({"type": "float"})
+                        elif vtag == 3: #double
+                            vtypes.append({"type": "double"})
+                        elif vtag == 4: #long
+                            vtypes.append({"type": "long"})
+                        elif vtag == 5: #null
+                            vtypes.append({"type": "null"})
+                        elif vtag == 6: #uninitializedThis
+                            vtypes.append({"type": "uninitializedThis"})
+                        elif vtag == 7: #object
+                            vtypes.append({"type": "object", "index": int.from_bytes(smt[:2], "big")})
+                            smt = smt[2:]
+                        elif vtag == 8: #uninitialized
+                            vtypes.append({"type": "uninitialized", "offset": int.from_bytes(smt[:2], "big")})
+                            smt = smt[2:]
+                    return smt, vtypes
+
+                r["data"] = []
+                
+                while len(smt) > 0:
+                    tag = int.from_bytes(smt[:1], "big")
+                    smt = smt[1:]
+                    
+                    frame = None
+                    if tag >= 0 and tag <= 63: #same_frame
+                        frame = {"tag": tag, "frame": "same_frame", "offset_delta": tag}
+                    elif tag >= 64 and tag <= 127: #same_locals_1_stack_item_frame
+                        smt, vti = verification_type_info(smt, 1)
+                        frame = {"tag": tag, "frame": "same_locals_1_stack_item_frame", "offset_delta": tag - 64, "stack": vti}
+                    elif tag == 247: #same_locals_1_stack_item_frame_extended
+                        offset_delta = int.from_bytes(smt[:2], "big")
+                        smt = smt[2:]
+                        smt, vti = verification_type_info(smt, 1)
+                        frame = {"tag": tag, "frame": "same_locals_1_stack_item_frame_extended", "offset_delta": offset_delta, "stack": vti}
+                    elif tag >= 248 and tag <= 250: #chop_frame
+                        offset_delta = int.from_bytes(smt[:2], "big")
+                        smt = smt[2:]
+                        frame = {"tag": tag, "frame": "chop_frame", "offset_delta": offset_delta, "locals_absent": 251 - tag}
+                    elif tag == 251: #same_frame_extended
+                        offset_delta = int.from_bytes(smt[:2], "big")
+                        smt = smt[2:]
+                        frame = {"tag": tag, "frame": "same_frame_extended", "offset_delta": offset_delta}
+                    elif tag >= 252 and tag <= 254: #append_frame
+                        offset_delta = int.from_bytes(smt[:2], "big")
+                        smt = smt[2:]
+                        locals_plus = tag - 251
+                        smt, vti = verification_type_info(smt, locals_plus)
+                        frame = {"tag": tag, "frame": "append_frame", "offset_delta": offset_delta, "locals": vti}
+                    elif tag == 255:
+                        offset_delta = int.from_bytes(smt[:2], "big")
+                        smt = smt[2:]
+                        number_of_locals = int.from_bytes(smt[:2], "big")
+                        smt = smt[2:]
+                        smt, all_locals = verification_type_info(smt, number_of_locals)
+                        number_of_stack_items = int.from_bytes(smt[:2], "big")
+                        smt = smt[2:]
+                        smt, stack = verification_type_info(smt, number_of_stack_items)
+                        frame = {"tag": tag, "frame": "full_frame", "offset_delta": offset_delta, "locals": all_locals, "stack": stack}
+
+                    r["data"].append(frame)
+                
+                #r["data"] = sd.hex()
                 d = d[l:]
             else:
                 c = False
@@ -517,6 +595,68 @@ class Attribute:
             tmp = b""
             tmp += d["data"]["class_index"].to_bytes(2, "big")
             tmp += d["data"]["method_index"].to_bytes(2, "big")
+
+            r += len(tmp).to_bytes(4, "big")
+            r += tmp
+        elif d["type"].lower() == "stackmaptable":
+            tmp = b""
+
+            def verification_type_info(vti):
+                vto = b""
+                for i in vti:
+                    if i["type"] == "top":
+                        vto += b"\x00"
+                    elif i["type"] == "int":
+                        vto += b"\x01"
+                    elif i["type"] == "float":
+                        vto += b"\x02"
+                    elif i["type"] == "double":
+                        vto += b"\x03"
+                    elif i["type"] == "long":
+                        vto += b"\x04"
+                    elif i["type"] == "null":
+                        vto += b"\x05"
+                    elif i["type"] == "uninitializedThis":
+                        vto += b"\x06"
+                    elif i["type"] == "object":
+                        vto += b"\x07"
+                        vto += i["index"].to_bytes(2, "big")
+                    elif i["type"] == "uninitialized":
+                        vto += b"\x08"
+                        vto += i["offset"].to_bytes(2, "big")
+                return vto
+            
+            tmp += len(d["data"]).to_bytes(2, "big")
+            
+            for frame in d["data"]:
+                tmp += frame["tag"].to_bytes(1, "big")
+
+                if frame["frame"] == "same_frame": #same_frame, add no more information
+                    pass
+                elif frame["frame"] == "same_locals_1_stack_item_frame":
+                    tmp += verification_type_info(frame["stack"])
+                elif frame["frame"] == "same_locals_1_stack_item_frame_extended":
+                    tmp += frame["offset_delta"].to_bytes(2, "big")
+                    tmp += verification_type_info(frame["stack"])
+                elif frame["frame"] == "chop_frame":
+                    tmp += frame["offset_delta"].to_bytes(2, "big")
+                elif frame["frame"] == "same_frame_extended":
+                    tmp += frame["offset_delta"].to_bytes(2, "big")
+                elif frame["frame"] == "append_frame":
+                    tmp += frame["offset_delta"].to_bytes(2, "big")
+                    tmp += verification_type_info(frame["locals"])
+                elif frame["frame"] == "full_frame":
+                    tmp += frame["offset_delta"].to_bytes(2, "big")
+                    tmp += len(frame["locals"]).to_bytes(2, "big")
+                    tmp += verification_type_info(frame["locals"])
+                    tmp += len(frame["stack"]).to_bytes(2, "big")
+                    tmp += verification_type_info(frame["stack"])
+
+            #print("StackMapTable:", tmp.hex())
+            #ad = bytes.fromhex(d["data"])
+            
+            #r += len(ad).to_bytes(4, "big")
+            #r += ad
 
             r += len(tmp).to_bytes(4, "big")
             r += tmp
