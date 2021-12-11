@@ -511,6 +511,36 @@ class Attribute:
                 
                 #r["data"] = sd.hex()
                 d = d[l:]
+            elif t.lower() == "signature":
+                r["data"] = int.from_bytes(d[:2], "big")
+                d = d[2:]
+            elif t.lower() == "linenumbertable":
+                tl = int.from_bytes(d[:2], "big")
+                d = d[2:]
+
+                r["data"] = []
+
+                for i in range(tl):
+                    r["data"].append({"start_pc": int.from_bytes(d[:2], "big"), "line_number": int.from_bytes(d[2:4], "big")})
+                    d = d[4:]
+            elif t.lower() == "localvariabletable":
+                tl = int.from_bytes(d[:2], "big")
+                d = d[2:]
+
+                r["data"] = []
+
+                for i in range(tl):
+                    start_pc = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    length = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    name_index = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    descriptor_index = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    index = int.from_bytes(d[:2], "big")
+                    d = d[2:]
+                    r["data"].append({"start_pc": start_pc, "length": length, "name_index": name_index, "descriptor_index": descriptor_index, "index": index})
             else:
                 c = False
         
@@ -660,7 +690,30 @@ class Attribute:
 
             r += len(tmp).to_bytes(4, "big")
             r += tmp
-        
+        elif d["type"].lower() == "signature":
+            r += b"\x00\x00\x00\x02"
+            r += d["data"].to_bytes(2, "big")
+        elif d["type"].lower() == "linenumbertable":
+            tmp = b""
+            tmp += len(d["data"]).to_bytes(2, "big")
+            for x in d["data"]:
+                tmp += x["start_pc"].to_bytes(2, "big")
+                tmp += x["line_number"].to_bytes(2, "big")
+            
+            r += len(tmp).to_bytes(4, "big")
+            r += tmp
+        elif d["type"].lower() == "localvariabletable":
+            tmp = b""
+            tmp += len(d["data"]).to_bytes(2, "big")
+            for x in d["data"]:
+                tmp += x["start_pc"].to_bytes(2, "big")
+                tmp += x["length"].to_bytes(2, "big")
+                tmp += x["name_index"].to_bytes(2, "big")
+                tmp += x["descriptor_index"].to_bytes(2, "big")
+                tmp += x["index"].to_bytes(2, "big")
+            
+            r += len(tmp).to_bytes(4, "big")
+            r += tmp
         return r
 
 if __name__ == "__main__":
